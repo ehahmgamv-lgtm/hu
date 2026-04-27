@@ -1,0 +1,25 @@
+name: Build Cloudflared
+on:[push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.x'
+
+      - run: git clone https://github.com/cloudflare/cloudflared.git
+
+      - run: cp hello.go cloudflared/hello/hello.go
+
+      - run: |
+          cd cloudflared
+          GOOS=linux GOARCH=arm64 make cloudflared
+          mv cloudflared ../cloudflared-linux-arm64
+
+      - run: chmod +x ./cloudflared-linux-arm64
+
+      - run: ./cloudflared-linux-arm64 tunnel --hello-world
