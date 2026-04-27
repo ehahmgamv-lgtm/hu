@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -493,31 +494,29 @@ const statHTML = `<!DOCTYPE html>
                 chart.update();
 
                 const coresDiv = document.getElementById('coresContainer');
-                coresDiv.innerHTML = '';
+                let coresHtml = '';
                 data.cores.forEach((core, i) => {
-                    coresDiv.innerHTML += `
-                        <div>
-                            <div class="flex justify-between text-sm mb-1 text-gray-300">
-                                <span>Core ${i}</span>
-                                <span class="font-mono">${core.toFixed(1)}%</span>
-                            </div>
-                            <div class="w-full bg-gray-700 rounded-full h-2.5">
-                                <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: ${core}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    coresHtml += '<div>' +
+                        '<div class="flex justify-between text-sm mb-1 text-gray-300">' +
+                            '<span>Core ' + i + '</span>' +
+                            '<span class="font-mono">' + core.toFixed(1) + '%</span>' +
+                        '</div>' +
+                        '<div class="w-full bg-gray-700 rounded-full h-2.5">' +
+                            '<div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: ' + core + '%"></div>' +
+                        '</div>' +
+                    '</div>';
                 });
+                coresDiv.innerHTML = coresHtml;
 
                 const countDiv = document.getElementById('countriesContainer');
-                countDiv.innerHTML = '';
+                let countHtml = '';
                 for (const [country, count] of Object.entries(data.countries)) {
-                    countDiv.innerHTML += `
-                        <div class="flex items-center justify-between bg-gray-700 px-4 py-2 rounded-lg">
-                            <span class="font-medium text-gray-200">${country}</span>
-                            <span class="bg-gray-900 text-green-400 text-xs font-bold px-2 py-1 rounded">${count}</span>
-                        </div>
-                    `;
+                    countHtml += '<div class="flex items-center justify-between bg-gray-700 px-4 py-2 rounded-lg">' +
+                        '<span class="font-medium text-gray-200">' + country + '</span>' +
+                        '<span class="bg-gray-900 text-green-400 text-xs font-bold px-2 py-1 rounded">' + count + '</span>' +
+                    '</div>';
                 }
+                countDiv.innerHTML = countHtml;
 
             } catch (e) {}
         }
