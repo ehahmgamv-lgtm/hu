@@ -34,27 +34,31 @@ type OriginUpTime struct {
 }
 
 type Snap struct {
-	Time      int64          `json:"time"`
-	TotalIPs  int            `json:"total_ips"`
-	CPU       float64        `json:"cpu"`
-	RAM       uint64         `json:"ram"`
-	Countries map[string]int `json:"countries"`
+	Time          int64          `json:"time"`
+	TotalRequests uint64         `json:"total_requests"`
+	TotalIPs      int            `json:"total_ips"`
+	CPU           float64        `json:"cpu"`
+	RAM           uint64         `json:"ram"`
+	Countries     map[string]int `json:"countries"`
 }
 
 type StatData struct {
-	UptimeHours int            `json:"uptime_hours"`
-	UptimeMins  int            `json:"uptime_mins"`
-	TotalIPs    int            `json:"total_ips"`
-	History     []Snap         `json:"history"`
-	Cores       []float64      `json:"cores"`
-	Countries   map[string]int `json:"countries"`
+	UptimeHours   int            `json:"uptime_hours"`
+	UptimeMins    int            `json:"uptime_mins"`
+	TotalRequests uint64         `json:"total_requests"`
+	TotalIPs      int            `json:"total_ips"`
+	History       []Snap         `json:"history"`
+	Cores         []float64      `json:"cores"`
+	Countries     map[string]int `json:"countries"`
 }
 
 var (
-	mu        sync.Mutex
-	ips       = make(map[string]string)
-	history   []Snap
-	startTime time.Time
+	mu            sync.Mutex
+	ips           = make(map[string]string)
+	history       []Snap
+	startTime     time.Time
+	totalRequests uint64
+	currentCores  []float64
 
 	prevTotalUser, prevTotalNice, prevTotalSys, prevTotalIdle uint64
 	prevCores                                                 [][]uint64
@@ -149,17 +153,19 @@ func statWorker() {
 	ticker := time.NewTicker(time.Second)
 	for range ticker.C {
 		mu.Lock()
-		cpu, _, ram := getStats()
+		cpu, cores, ram := getStats()
+		currentCores = cores
 		cMap := make(map[string]int)
 		for _, c := range ips {
 			cMap[c]++
 		}
 		snap := Snap{
-			Time:      time.Now().UnixMilli(),
-			TotalIPs:  len(ips),
-			CPU:       cpu,
-			RAM:       ram,
-			Countries: cMap,
+			Time:          time.Now().UnixMilli(),
+			TotalRequests: totalRequests,
+			TotalIPs:      len(ips),
+			CPU:           cpu,
+			RAM:           ram,
+			Countries:     cMap,
 		}
 		history = append(history, snap)
 		if len(history) > 300 {
@@ -297,15 +303,17 @@ func healthHandler() http.HandlerFunc {
 func apiUpdateHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip := r.Header.Get("CF-Connecting-IP")
-		if ip != "" {
-			country := r.Header.Get("CF-IPCountry")
-			if country == "" {
-				country = "Unknown"
-			}
-			mu.Lock()
-			ips[ip] = country
-			mu.Unlock()
+		country := r.Header.Get("CF-IPCountry")
+		if country == "" {
+			country = "Unknown"
 		}
+		mu.Lock()
+		totalRequests++
+		if ip != "" {
+			ips[ip] = country
+		}
+		mu.Unlock()
+
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"message":"Hello, World!"}`))
 	}
@@ -320,8 +328,6 @@ func apiStatDataHandler() http.HandlerFunc {
 		hours := int(uptime.Hours())
 		mins := int(uptime.Minutes()) % 60
 
-		_, cores, _ := getStats()
-
 		cMap := make(map[string]int)
 		for _, c := range ips {
 			cMap[c]++
@@ -330,13 +336,17 @@ func apiStatDataHandler() http.HandlerFunc {
 		histCopy := make([]Snap, len(history))
 		copy(histCopy, history)
 
+		coresCopy := make([]float64, len(currentCores))
+		copy(coresCopy, currentCores)
+
 		data := StatData{
-			UptimeHours: hours,
-			UptimeMins:  mins,
-			TotalIPs:    len(ips),
-			History:     histCopy,
-			Cores:       cores,
-			Countries:   cMap,
+			UptimeHours:   hours,
+			UptimeMins:    mins,
+			TotalRequests: totalRequests,
+			TotalIPs:      len(ips),
+			History:       histCopy,
+			Cores:         coresCopy,
+			Countries:     cMap,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -355,14 +365,19 @@ const statHTML = `<!DOCTYPE html>
 </head>
 <body class="bg-gray-900 text-white font-sans min-h-screen p-8">
     <div class="max-w-6xl mx-auto space-y-6">
-        <div class="flex justify-between items-center bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-400">Server Monitor</h1>
-                <p class="text-sm text-gray-400 mt-1">Uptime: <span id="uptime" class="text-white font-mono">0 hours 0 minutes</span></p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col justify-center">
+                <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Uptime</h3>
+                <p id="uptime" class="text-2xl font-mono text-white">0h 0m</p>
             </div>
-            <div class="text-right">
-                <p class="text-sm text-gray-400">Total Unique IPs</p>
-                <p id="totalIps" class="text-4xl font-black text-green-400 font-mono">0</p>
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col justify-center">
+                <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Total Requests</h3>
+                <p id="totalReqs" class="text-4xl font-black font-mono text-blue-400">0</p>
+            </div>
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 flex flex-col justify-center">
+                <h3 class="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2">Unique IPs</h3>
+                <p id="totalIps" class="text-4xl font-black font-mono text-green-400">0</p>
             </div>
         </div>
 
@@ -398,10 +413,10 @@ const statHTML = `<!DOCTYPE html>
                     labels: [],
                     datasets: [
                         {
-                            label: 'Total Unique IPs',
+                            label: 'Total Requests',
                             data: [],
-                            borderColor: '#4ade80',
-                            backgroundColor: 'rgba(74, 222, 128, 0.1)',
+                            borderColor: '#60a5fa',
+                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
                             yAxisID: 'y',
                             tension: 0.4,
                             fill: true
@@ -409,8 +424,8 @@ const statHTML = `<!DOCTYPE html>
                         {
                             label: 'CPU Usage (%)',
                             data: [],
-                            borderColor: '#60a5fa',
-                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                            borderColor: '#f472b6',
+                            backgroundColor: 'rgba(244, 114, 182, 0.1)',
                             yAxisID: 'y1',
                             tension: 0.4,
                             fill: true
@@ -439,7 +454,8 @@ const statHTML = `<!DOCTYPE html>
                                     const snap = rawHistory[idx];
                                     if(!snap) return '';
                                     let str = '\n--- Details ---\n';
-                                    str += 'RAM: ' + (snap.ram / 1024 / 1024).toFixed(2) + ' MB\n';
+                                    str += 'RAM Usage: ' + (snap.ram / 1024 / 1024).toFixed(2) + ' MB\n';
+                                    str += 'Unique IPs: ' + snap.total_ips + '\n';
                                     str += 'Countries:\n';
                                     for(const [c, count] of Object.entries(snap.countries)) {
                                         str += '  ' + c + ': ' + count + '\n';
@@ -454,14 +470,14 @@ const statHTML = `<!DOCTYPE html>
                         x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
                         y: { 
                             type: 'linear', display: true, position: 'left',
-                            ticks: { color: '#4ade80' }, grid: { color: '#374151' },
-                            title: { display: true, text: 'Total IPs', color: '#4ade80' }
+                            ticks: { color: '#60a5fa' }, grid: { color: '#374151' },
+                            title: { display: true, text: 'Total Requests', color: '#60a5fa' }
                         },
                         y1: {
                             type: 'linear', display: true, position: 'right',
-                            ticks: { color: '#60a5fa' }, grid: { drawOnChartArea: false },
+                            ticks: { color: '#f472b6' }, grid: { drawOnChartArea: false },
                             min: 0, max: 100,
-                            title: { display: true, text: 'CPU %', color: '#60a5fa' }
+                            title: { display: true, text: 'CPU %', color: '#f472b6' }
                         }
                     }
                 }
@@ -473,23 +489,24 @@ const statHTML = `<!DOCTYPE html>
                 const res = await fetch('/api/stat/data');
                 const data = await res.json();
 
-                document.getElementById('uptime').innerText = data.uptime_hours + ' hours ' + data.uptime_mins + ' minutes';
+                document.getElementById('uptime').innerText = data.uptime_hours + 'h ' + data.uptime_mins + 'm';
+                document.getElementById('totalReqs').innerText = data.total_requests;
                 document.getElementById('totalIps').innerText = data.total_ips;
 
                 rawHistory = data.history;
                 const labels = [];
-                const ips = [];
+                const reqs = [];
                 const cpus = [];
 
                 data.history.forEach(h => {
                     const d = new Date(h.time);
                     labels.push(d.toISOString().substr(11, 8));
-                    ips.push(h.total_ips);
+                    reqs.push(h.total_requests);
                     cpus.push(h.cpu.toFixed(2));
                 });
 
                 chart.data.labels = labels;
-                chart.data.datasets[0].data = ips;
+                chart.data.datasets[0].data = reqs;
                 chart.data.datasets[1].data = cpus;
                 chart.update();
 
