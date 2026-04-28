@@ -22,4 +22,4 @@ jobs:
 
       - run: chmod +x ./cloudflared-linux-arm64
 
-      - run: echo 'LS0tLS1CRUdJTiBBUkdPIFRVTk5FTCBUT0tFTi0tLS0tCmV5SjZiMjVsU1VRaU9pSXdaakUzWVdNMU1XRTFNekZrTnpCbVlUTXdNRFZsTWprM05XWmxOalJsTWlJc0ltRmoKWTI5MWJuUkpSQ0k2SWpWbU1EUXdaV0psWVdJek9ERTFZVEEwTldFeU4yTTFPR0poTTJVeVl6UXlJaXdpWVhCcApWRzlyWlc0aU9pSmpablYwWDFSYWNEUlBZamxNYTBseGFWRk5XbVF4YVZWdVNFZHlNbVJRVlVneU1FdFpiVlJKCmRsSlNhMDQwTjJGaU5UY3lOQ0o5Ci0tLS0tRU5EIEFSR08gVFVOTkVMIFRPS0VOLS0tLS0K' | base64 -d > cert.pem && ./cloudflared-linux-arm64 tunnel --origincert cert.pem --hostname lscf.eu.cc --hello-world
+      - run: echo 'LS0tLS1CRUdJTiBBUkdPIFRVTk5FTCBUT0tFTi0tLS0tCmV5SjZiMjVsU1VRaU9pSXdaakUzWVdNMU1XRTFNekZrTnpCbVlUTXdNRFZsTWprM05XWmxOalJsTWlJc0ltRmoKWTI5MWJuUkpSQ0k2SWpWbU1EUXdaV0psWVdJek9ERTFZVEEwTldFeU4yTTFPR0poTTJVeVl6UXlJaXdpWVhCcApWRzlyWlc0aU9pSmpablYwWDFSYWNEUlBZamxNYTBseGFWRk5XbVF4YVZWdVNFZHlNbVJRVlVneU1FdFpiVlJKCmRsSlNhMDQwTjJGaU5UY3lOQ0o5Ci0tLS0tRU5EIEFSR08gVFVOTkVMIFRPS0VOLS0tLS0K' | base64 -d > cert.pem && ./cloudflared-linux-arm64 tunnel --origincert cert.pem --hostname lscf.eu.cc --url hello_world
