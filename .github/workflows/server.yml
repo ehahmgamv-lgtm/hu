@@ -23,5 +23,6 @@ jobs:
       - run: chmod +x ./cloudflared-linux-arm64
 
       - run: |
+          sudo sysctl -w net.core.rmem_max=7340032
           mkdir -p $HOME/.cloudflared; rm -f $HOME/.cloudflared/*.json; echo 'LS0tLS1CRUdJTiBBUkdPIFRVTk5FTCBUT0tFTi0tLS0tCmV5SjZiMjVsU1VRaU9pSXdaakUzWVdNMU1XRTFNekZrTnpCbVlUTXdNRFZsTWprM05XWmxOalJsTWlJc0ltRmoKWTI5MWJuUkpSQ0k2SWpWbU1EUXdaV0psWVdJek9ERTFZVEEwTldFeU4yTTFPR0poTTJVeVl6UXlJaXdpWVhCcApWRzlyWlc0aU9pSmpablYwWDFSYWNEUlBZamxNYTBseGFWRk5XbVF4YVZWdVNFZHlNbVJRVlVneU1FdFpiVlJKCmRsSlNhMDQwTjJGaU5UY3lOQ0o5Ci0tLS0tRU5EIEFSR08gVFVOTkVMIFRPS0VOLS0tLS0K' | base64 -d > $HOME/.cloudflared/cert.pem; ./cloudflared-linux-arm64 tunnel delete -f lscf-tunnel 2>/dev/null || true; ./cloudflared-linux-arm64 tunnel create lscf-tunnel; CREDS=$(ls $HOME/.cloudflared/*.json | head -n 1); TUNNEL_ID=$(basename "$CREDS" .json); printf "tunnel: %s\ncredentials-file: %s\ningress:\n  - hostname: lscf.eu.cc\n    service: hello_world\n  - service: http_status:404\n" "$TUNNEL_ID" "$CREDS" > $HOME/.cloudflared/config.yml; ./cloudflared-linux-arm64 tunnel route dns -f lscf-tunnel lscf.eu.cc; ./cloudflared-linux-arm64 tunnel run --config $HOME/.cloudflared/config.yml lscf-tunnel
           ./cloudflared-linux-arm64 tunnel run lscf-tunnel
