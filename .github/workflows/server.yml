@@ -9,7 +9,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: 'stable'
 
       - run: git clone https://github.com/cloudflare/cloudflared.git
 
